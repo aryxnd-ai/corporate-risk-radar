@@ -352,37 +352,42 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**SINGLE COMPANY ANALYSIS**")
-    ticker_input = st.text_input("", placeholder="e.g. AAPL, MSFT, TSLA", label_visibility="collapsed").upper().strip()
-    run_single   = st.button("▶  ANALYZE", use_container_width=True)
+    ticker_input = st.text_input(
+        "Single company ticker",
+        placeholder="e.g. AAPL, MSFT, TSLA",
+        label_visibility="collapsed"
+    ).upper().strip()
+    run_single = st.button("▶  ANALYZE", use_container_width=True)
 
-st.markdown("**PORTFOLIO SCREENER**")
+    st.markdown("---")
+    st.markdown("**PORTFOLIO SCREENER**")
 
-company_presets = {
-    "Custom": "AAPL, MSFT, TSLA, NVDA, META, AMZN, GOOGL, JPM, V, NFLX, AMD, COST",
-    "Mega Cap Tech": "AAPL, MSFT, NVDA, AMZN, META, GOOGL, NFLX, AMD, ORCL, ADBE",
-    "Banks & Payments": "JPM, BAC, GS, MS, C, WFC, V, MA, COF, PYPL",
-    "Retail & Consumer": "COST, WMT, TGT, MCD, SBUX, NKE, KO, PEP, PG, DIS",
-    "Healthcare": "UNH, JNJ, LLY, ABBV, MRK, PFE, TMO, DHR, ISRG, MDT",
-    "Energy & Industrials": "XOM, CVX, CAT, GE, HON, DE, ETN, BA, RTX, UPS",
-    "Balanced Market Leaders": "AAPL, MSFT, NVDA, AMZN, META, JPM, V, COST, UNH, XOM, CAT, KO"
-}
+    company_presets = {
+        "Custom": "AAPL, MSFT, TSLA, NVDA, META, AMZN, GOOGL, JPM, V, NFLX, AMD, COST",
+        "Mega Cap Tech": "AAPL, MSFT, NVDA, AMZN, META, GOOGL, NFLX, AMD, ORCL, ADBE",
+        "Banks & Payments": "JPM, BAC, GS, MS, C, WFC, V, MA, COF, PYPL",
+        "Retail & Consumer": "COST, WMT, TGT, MCD, SBUX, NKE, KO, PEP, PG, DIS",
+        "Healthcare": "UNH, JNJ, LLY, ABBV, MRK, PFE, TMO, DHR, ISRG, MDT",
+        "Energy & Industrials": "XOM, CVX, CAT, GE, HON, DE, ETN, BA, RTX, UPS",
+        "Balanced Market Leaders": "AAPL, MSFT, NVDA, AMZN, META, JPM, V, COST, UNH, XOM, CAT, KO"
+    }
 
-preset_choice = st.selectbox(
-    "Choose portfolio preset",
-    list(company_presets.keys()),
-    index=0
-)
+    preset_choice = st.selectbox(
+        "Choose portfolio preset",
+        list(company_presets.keys()),
+        index=0
+    )
 
-default_list = company_presets[preset_choice]
+    default_list = company_presets[preset_choice]
 
-portfolio_input = st.text_area(
-    "Portfolio tickers",
-    value=default_list,
-    height=140,
-    label_visibility="collapsed"
-)
+    portfolio_input = st.text_area(
+        "Portfolio tickers",
+        value=default_list,
+        height=140,
+        label_visibility="collapsed"
+    )
 
-run_portfolio = st.button("▶  RUN SCREENER", use_container_width=True)
+    run_portfolio = st.button("▶  RUN SCREENER", use_container_width=True)
 
     st.markdown("---")
     st.markdown(f"""
@@ -395,16 +400,6 @@ run_portfolio = st.button("▶  RUN SCREENER", use_container_width=True)
     ⚠ Not financial advice.
     </div>
     """, unsafe_allow_html=True)
-
-# ── Main content ───────────────────────────────────────────────────────────────
-
-st.markdown("""
-<div style='display:flex;align-items:baseline;gap:16px;margin-bottom:4px'>
-  <span style='font-family:IBM Plex Mono;font-size:22px;font-weight:600;color:#fff;letter-spacing:-0.5px'>Corporate Health & Risk Radar</span>
-  <span style='font-size:11px;color:#4a6080;font-family:IBM Plex Mono;letter-spacing:1px'>v2.0 · EQUITY INTELLIGENCE TERMINAL</span>
-</div>
-<div style='height:1px;background:linear-gradient(90deg,#4a9eff,transparent);margin-bottom:24px'></div>
-""", unsafe_allow_html=True)
 
 
 # ── Single Company View ────────────────────────────────────────────────────────
