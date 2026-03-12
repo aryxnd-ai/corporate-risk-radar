@@ -2,16 +2,17 @@
 Financial Data Fetcher
 ========================
 Retrieves and normalises financial metrics from Yahoo Finance via yfinance.
-Handles missing data gracefully — many metrics are unavailable for smaller
-or non-US companies and we must not crash on None values.
+Handles missing data gracefully so missing fields do not crash the app.
+Also accepts either a list of tickers or a comma-separated ticker string.
 """
 
-import yfinance as yf
-import pandas as pd
-from typing import Optional
+from typing import Optional, Union, Iterable
 import warnings
-warnings.filterwarnings("ignore")
 
+import pandas as pd
+import yfinance as yf
+
+warnings.filterwarnings("ignore")
 
 METRIC_KEYS = [
     "revenueGrowth",
@@ -40,6 +41,7 @@ METRIC_KEYS = [
 
 
 def _safe_get(info: dict, key: str) -> Optional[float]:
+    """Safely convert a Yahoo Finance info field to float."""
     val = info.get(key)
     if val is None or val == "N/A":
         return None
@@ -49,36 +51,83 @@ def _safe_get(info: dict, key: str) -> Optional[float]:
         return None
 
 
+def _clean_ticker(ticker: str) -> str:
+    """Normalize a single ticker."""
+    return str(ticker).strip().upper()
+
+
+def _normalize_tickers(tickers: Union[str, Iterable]) -> list[str]:
+    """
+    Accept either:
+    - "AAPL, MSFT, TSLA"
+    - ["AAPL", "MSFT", "TSLA"]
+    and return a clean list of tickers.
+    """
+    if tickers is None:
+        return []
+
+    if isinstance(tickers, str):
+        raw = tickers.split(",")
+    else:
+        raw = list(tickers)
+
+    cleaned = []
+    for t in raw:
+        symbol = _clean_ticker(t)
+        if symbol:
+            cleaned.append(symbol)
+
+    # remove duplicates while preserving order
+    seen = set()
+    unique = []
+    for t in cleaned:
+        if t not in seen:
+            seen.add(t)
+            unique.append(t)
+
+    return unique
+
+
 def _derive_metrics(info: dict) -> dict:
     """Compute derived ratios not directly provided by yfinance."""
     derived = {}
 
-    total_revenue      = _safe_get(info, "totalRevenue")
-    total_assets       = _safe_get(info, "totalAssets")
-    operating_cf       = _safe_get(info, "operatingCashflow")
-    profit_margins     = _safe_get(info, "profitMargins")
-    current_assets     = _safe_get(info, "totalCurrentAssets")
-    current_liabilities= _safe_get(info, "totalCurrentLiabilities")
-    total_assets_      = _safe_get(info, "totalAssets")
+    total_revenue = _safe_get(info, "totalRevenue")
+    total_assets = _safe_get(info, "totalAssets")
+    operating_cf = _safe_get(info, "operatingCashflow")
+    current_assets = _safe_get(info, "totalCurrentAssets")
+    current_liabilities = _safe_get(info, "totalCurrentLiabilities")
+    total_debt = _safe_get(info, "totalDebt")
+    ebitda = _safe_get(info, "ebitda")
 
     # Asset Turnover = Revenue / Total Assets
-    if total_revenue and total_assets and total_assets != 0:
+    if total_revenue is not None and total_assets not in (None, 0):
         derived["assetTurnover"] = total_revenue / total_assets
+    else:
+        derived["assetTurnover"] = None
 
     # Operating CF Margin = Operating CF / Revenue
-    if operating_cf and total_revenue and total_revenue != 0:
+    if operating_cf is not None and total_revenue not in (None, 0):
         derived["operatingCashflowRatio"] = operating_cf / total_revenue
+    else:
+        derived["operatingCashflowRatio"] = None
 
     # Working Capital Ratio = (Current Assets - Current Liabilities) / Total Assets
-    if current_assets and current_liabilities and total_assets_:
+    if (
+        current_assets is not None
+        and current_liabilities is not None
+        and total_assets not in (None, 0)
+    ):
         wc = current_assets - current_liabilities
-        derived["workingCapitalRatio"] = wc / total_assets_ if total_assets_ != 0 else None
+        derived["workingCapitalRatio"] = wc / total_assets
+    else:
+        derived["workingCapitalRatio"] = None
 
-    # Debt to EBITDA proxy
-    total_debt = _safe_get(info, "totalDebt")
-    ebitda     = _safe_get(info, "ebitda")
-    if total_debt and ebitda and ebitda > 0:
+    # Debt to EBITDA
+    if total_debt is not None and ebitda not in (None, 0) and ebitda > 0:
         derived["debtToEbitda"] = total_debt / ebitda
+    else:
+        derived["debtToEbitda"] = None
 
     return derived
 
@@ -86,49 +135,99 @@ def _derive_metrics(info: dict) -> dict:
 def fetch_company_data(ticker: str) -> dict:
     """
     Fetch all financial metrics for a given ticker symbol.
-    Returns a flat dict of metric_name -> float|None.
+    Returns a flat dict of metric_name -> float|None plus metadata.
+    Returns {} if the ticker cannot be fetched.
     """
+    ticker = _clean_ticker(ticker)
+    if not ticker:
+        return {}
+
     try:
-        t    = yf.Ticker(ticker)
+        t = yf.Ticker(ticker)
         info = t.info or {}
     except Exception as e:
-        print(f"  [!] Failed to fetch {ticker}: {e}")
+        print(f"[!] Failed to fetch {ticker}: {e}")
+        return {}
+
+    # If Yahoo returns basically nothing, treat it as invalid / unavailable
+    if not info or not isinstance(info, dict):
         return {}
 
     base = {key: _safe_get(info, key) for key in METRIC_KEYS}
 
     # Company metadata
-    base["name"]     = info.get("longName") or info.get("shortName") or ticker
-    base["sector"]   = info.get("sector", "Unknown")
-    base["industry"] = info.get("industry", "Unknown")
-    base["country"]  = info.get("country", "Unknown")
-    base["currency"] = info.get("currency", "USD")
-    base["website"]  = info.get("website", "")
-    base["ticker"]   = ticker.upper()
+    base["name"] = info.get("longName") or info.get("shortName") or ticker
+    base["sector"] = info.get("sector") or "Unknown"
+    base["industry"] = info.get("industry") or "Unknown"
+    base["country"] = info.get("country") or "Unknown"
+    base["currency"] = info.get("currency") or "USD"
+    base["website"] = info.get("website") or ""
+    base["ticker"] = ticker
 
-    # Derived
+    # Derived metrics
     base.update(_derive_metrics(info))
+
+    # Minimal validity check:
+    # keep the record if we at least got metadata or one real metric
+    has_any_metric = any(
+        v is not None for k, v in base.items()
+        if k not in {"name", "sector", "industry", "country", "currency", "website", "ticker"}
+    )
+
+    has_identity = base["name"] != ticker or info.get("symbol") or info.get("shortName") or info.get("longName")
+
+    if not has_any_metric and not has_identity:
+        return {}
 
     return base
 
 
-def fetch_multiple(tickers: list, verbose: bool = True) -> dict:
-    """Fetch data for a list of tickers. Returns {ticker: metrics_dict}."""
+def fetch_multiple(tickers: Union[str, Iterable], verbose: bool = True) -> dict:
+    """
+    Fetch data for multiple tickers.
+    Accepts either:
+    - comma-separated string: "AAPL, MSFT, TSLA"
+    - iterable: ["AAPL", "MSFT", "TSLA"]
+
+    Returns:
+        {ticker: metrics_dict}
+    """
+    ticker_list = _normalize_tickers(tickers)
     results = {}
-    for t in tickers:
+
+    for ticker in ticker_list:
         if verbose:
-            print(f"  Fetching {t}...")
-        data = fetch_company_data(t)
+            print(f"Fetching {ticker}...")
+        data = fetch_company_data(ticker)
         if data:
-            results[t.upper()] = data
+            results[ticker] = data
+
     return results
 
 
 def metrics_to_dataframe(results: dict) -> pd.DataFrame:
-    """Convert the nested results dict to a flat DataFrame."""
+    """Convert nested results dict to a flat DataFrame."""
+    if not results:
+        return pd.DataFrame()
+
     rows = []
-    for ticker, m in results.items():
-        row = {"ticker": ticker}
-        row.update({k: v for k, v in m.items() if k not in ("name", "sector", "industry", "country", "currency", "website", "ticker")})
+    metadata_keys = {"name", "sector", "industry", "country", "currency", "website", "ticker"}
+
+    for ticker, metrics in results.items():
+        row = {
+            "ticker": ticker,
+            "name": metrics.get("name"),
+            "sector": metrics.get("sector"),
+            "industry": metrics.get("industry"),
+            "country": metrics.get("country"),
+            "currency": metrics.get("currency"),
+            "website": metrics.get("website"),
+        }
+
+        for key, value in metrics.items():
+            if key not in metadata_keys:
+                row[key] = value
+
         rows.append(row)
+
     return pd.DataFrame(rows)
