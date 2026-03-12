@@ -10,9 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import streamlit as st
 import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 from utils.data_fetcher import fetch_company_data, fetch_multiple
@@ -156,34 +154,47 @@ st.markdown("""
 # ── Color helpers ──────────────────────────────────────────────────────────────
 
 def health_color(score):
-    if score >= 75: return "#00d084"
-    if score >= 55: return "#4a9eff"
-    if score >= 38: return "#f5a623"
+    if score >= 75:
+        return "#00d084"
+    if score >= 55:
+        return "#4a9eff"
+    if score >= 38:
+        return "#f5a623"
     return "#e85d4a"
+
 
 def risk_color(level):
     return {
-        "MINIMAL":  "#00d084",
-        "LOW":      "#4a9eff",
+        "MINIMAL": "#00d084",
+        "LOW": "#4a9eff",
         "MODERATE": "#f5a623",
         "ELEVATED": "#e85d4a",
-        "HIGH":     "#e85d4a",
+        "HIGH": "#e85d4a",
         "CRITICAL": "#c0392b",
     }.get(level, "#6b7a99")
 
+
 def grade_color(grade):
-    if grade in ("A+", "A", "A-"): return "#00d084"
-    if grade in ("B+", "B", "B-"): return "#4a9eff"
-    if grade in ("C+", "C"):       return "#f5a623"
+    if grade in ("A+", "A", "A-"):
+        return "#00d084"
+    if grade in ("B+", "B", "B-"):
+        return "#4a9eff"
+    if grade in ("C+", "C"):
+        return "#f5a623"
     return "#e85d4a"
 
+
 def fmt_pct(v):
-    if v is None: return "—"
+    if v is None:
+        return "—"
     return f"{v*100:+.1f}%"
 
+
 def fmt_float(v, d=2):
-    if v is None: return "—"
+    if v is None:
+        return "—"
     return f"{v:.{d}f}"
+
 
 # ── Chart builders ─────────────────────────────────────────────────────────────
 
@@ -203,18 +214,22 @@ def make_gauge(score, label="Health Score"):
         title={"text": label, "font": {"size": 13, "color": "#6b7a99", "family": "IBM Plex Mono"}},
         number={"font": {"size": 36, "color": color, "family": "IBM Plex Mono"}, "suffix": ""},
         gauge={
-            "axis": {"range": [0, 100], "tickcolor": "#1e2a45", "tickfont": {"size": 9, "family": "IBM Plex Mono"}},
+            "axis": {
+                "range": [0, 100],
+                "tickcolor": "#1e2a45",
+                "tickfont": {"size": 9, "family": "IBM Plex Mono"},
+            },
             "bar": {"color": color, "thickness": 0.22},
             "bgcolor": "#0f1729",
             "bordercolor": "#1e2a45",
             "steps": [
-                {"range": [0,  30], "color": "rgba(232,93,74,0.15)"},
+                {"range": [0, 30], "color": "rgba(232,93,74,0.15)"},
                 {"range": [30, 55], "color": "rgba(245,166,35,0.10)"},
                 {"range": [55, 75], "color": "rgba(74,158,255,0.10)"},
-                {"range": [75,100], "color": "rgba(0,208,132,0.10)"},
+                {"range": [75, 100], "color": "rgba(0,208,132,0.10)"},
             ],
             "threshold": {"line": {"color": color, "width": 2}, "value": score},
-        }
+        },
     ))
     fig.update_layout(**CHART_LAYOUT, height=220)
     return fig
@@ -223,17 +238,25 @@ def make_gauge(score, label="Health Score"):
 def make_radar(components: dict, ticker: str):
     cats = list(components.keys())
     vals = list(components.values())
-    cats_closed = cats + [cats[0]]
-    vals_closed  = vals + [vals[0]]
 
-    color = health_color(sum(vals) / len(vals))
+    if not cats:
+        cats = ["No Data"]
+        vals = [0]
+
+    cats_closed = cats + [cats[0]]
+    vals_closed = vals + [vals[0]]
+
+    color = health_color(sum(vals) / len(vals)) if vals else "#4a9eff"
+    r = int(color[1:3], 16)
+    g = int(color[3:5], 16)
+    b = int(color[5:7], 16)
 
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
         r=vals_closed,
         theta=cats_closed,
         fill="toself",
-        fillcolor=f"rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.15)",
+        fillcolor=f"rgba({r},{g},{b},0.15)",
         line=dict(color=color, width=2),
         name=ticker,
     ))
@@ -241,8 +264,18 @@ def make_radar(components: dict, ticker: str):
         **CHART_LAYOUT,
         polar=dict(
             bgcolor="rgba(0,0,0,0)",
-            radialaxis=dict(visible=True, range=[0, 100], tickfont=dict(size=8, color="#4a6080"), gridcolor="#1e2a45", linecolor="#1e2a45"),
-            angularaxis=dict(tickfont=dict(size=10, color="#8899bb"), gridcolor="#1e2a45", linecolor="#1e2a45"),
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100],
+                tickfont=dict(size=8, color="#4a6080"),
+                gridcolor="#1e2a45",
+                linecolor="#1e2a45",
+            ),
+            angularaxis=dict(
+                tickfont=dict(size=10, color="#8899bb"),
+                gridcolor="#1e2a45",
+                linecolor="#1e2a45",
+            ),
         ),
         showlegend=False,
         height=280,
@@ -264,7 +297,7 @@ def make_comparison_bar(df: pd.DataFrame):
     ))
     fig.update_layout(
         **CHART_LAYOUT,
-        height=max(200, len(df) * 44),
+        height=max(200, len(df_sorted) * 44),
         xaxis=dict(range=[0, 115], showgrid=False, zeroline=False, visible=False),
         yaxis=dict(showgrid=False, tickfont=dict(family="IBM Plex Mono", size=12, color="#c9d1e0")),
         bargap=0.35,
@@ -273,9 +306,10 @@ def make_comparison_bar(df: pd.DataFrame):
 
 
 def make_risk_heatmap(df: pd.DataFrame):
-    RISK_ORDER = {"MINIMAL": 0, "LOW": 1, "MODERATE": 2, "ELEVATED": 3, "HIGH": 4, "CRITICAL": 5}
-    df["risk_num"] = df["risk_level"].map(RISK_ORDER).fillna(2)
-    df_sorted = df.sort_values("health_score", ascending=False)
+    risk_order = {"MINIMAL": 0, "LOW": 1, "MODERATE": 2, "ELEVATED": 3, "HIGH": 4, "CRITICAL": 5}
+    df_local = df.copy()
+    df_local["risk_num"] = df_local["risk_level"].map(risk_order).fillna(2)
+    df_sorted = df_local.sort_values("health_score", ascending=False)
 
     fig = go.Figure(go.Bar(
         x=df_sorted["ticker"],
@@ -288,8 +322,16 @@ def make_risk_heatmap(df: pd.DataFrame):
     fig.update_layout(
         **CHART_LAYOUT,
         height=260,
-        yaxis=dict(title="Active Signals", showgrid=True, gridcolor="#1e2a45", tickfont=dict(family="IBM Plex Mono")),
-        xaxis=dict(showgrid=False, tickfont=dict(family="IBM Plex Mono", size=12, color="#c9d1e0")),
+        yaxis=dict(
+            title="Active Signals",
+            showgrid=True,
+            gridcolor="#1e2a45",
+            tickfont=dict(family="IBM Plex Mono"),
+        ),
+        xaxis=dict(
+            showgrid=False,
+            tickfont=dict(family="IBM Plex Mono", size=12, color="#c9d1e0"),
+        ),
     )
     return fig
 
@@ -297,15 +339,13 @@ def make_risk_heatmap(df: pd.DataFrame):
 def make_scatter_quadrant(df: pd.DataFrame):
     fig = go.Figure()
 
-    # Quadrant shading
     fig.add_shape(type="rect", x0=0, y0=50, x1=5, y1=100, fillcolor="rgba(232,93,74,0.06)", line_width=0)
-    fig.add_shape(type="rect", x0=0, y0=0,  x1=5, y1=50,  fillcolor="rgba(245,166,35,0.06)", line_width=0)
-    fig.add_shape(type="rect", x0=5, y0=0,  x1=10, y1=50, fillcolor="rgba(74,158,255,0.06)", line_width=0)
+    fig.add_shape(type="rect", x0=0, y0=0, x1=5, y1=50, fillcolor="rgba(245,166,35,0.06)", line_width=0)
+    fig.add_shape(type="rect", x0=5, y0=0, x1=10, y1=50, fillcolor="rgba(74,158,255,0.06)", line_width=0)
     fig.add_shape(type="rect", x0=5, y0=50, x1=10, y1=100, fillcolor="rgba(0,208,132,0.06)", line_width=0)
 
-    # Midpoint lines
     fig.add_hline(y=50, line_dash="dot", line_color="#1e2a45", line_width=1)
-    fig.add_vline(x=5,  line_dash="dot", line_color="#1e2a45", line_width=1)
+    fig.add_vline(x=5, line_dash="dot", line_color="#1e2a45", line_width=1)
 
     colors = [health_color(s) for s in df["health_score"]]
     fig.add_trace(go.Scatter(
@@ -320,15 +360,37 @@ def make_scatter_quadrant(df: pd.DataFrame):
     fig.update_layout(
         **CHART_LAYOUT,
         height=320,
-        xaxis=dict(title="Risk Signals", range=[-0.5, 9.5], showgrid=True, gridcolor="#1e2a45", tickfont=dict(family="IBM Plex Mono")),
-        yaxis=dict(title="Health Score", range=[0, 105], showgrid=True, gridcolor="#1e2a45", tickfont=dict(family="IBM Plex Mono")),
+        xaxis=dict(
+            title="Risk Signals",
+            range=[-0.5, 9.5],
+            showgrid=True,
+            gridcolor="#1e2a45",
+            tickfont=dict(family="IBM Plex Mono"),
+        ),
+        yaxis=dict(
+            title="Health Score",
+            range=[0, 105],
+            showgrid=True,
+            gridcolor="#1e2a45",
+            tickfont=dict(family="IBM Plex Mono"),
+        ),
     )
-    # Quadrant labels
-    for text, x, y in [("⚠ HIGH RISK / HEALTHY", 0.5, 97), ("⚠ HIGH RISK / DISTRESSED", 0.5, 5),
-                        ("✓ LOW RISK / HEALTHY", 7.5, 97), ("● LOW RISK / WEAK", 7.5, 5)]:
-        fig.add_annotation(x=x if "HIGH" in text else x, y=y, text=text,
-                           font=dict(size=8, color="#2a3a55", family="IBM Plex Mono"),
-                           showarrow=False, xanchor="left")
+
+    annotations = [
+        ("⚠ HIGH RISK / HEALTHY", 0.5, 97),
+        ("⚠ HIGH RISK / DISTRESSED", 0.5, 5),
+        ("✓ LOW RISK / HEALTHY", 7.5, 97),
+        ("● LOW RISK / WEAK", 7.5, 5),
+    ]
+    for text, x, y in annotations:
+        fig.add_annotation(
+            x=x,
+            y=y,
+            text=text,
+            font=dict(size=8, color="#2a3a55", family="IBM Plex Mono"),
+            showarrow=False,
+            xanchor="left",
+        )
     return fig
 
 
@@ -355,9 +417,9 @@ with st.sidebar:
     ticker_input = st.text_input(
         "Single company ticker",
         placeholder="e.g. AAPL, MSFT, TSLA",
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     ).upper().strip()
-    run_single = st.button("▶  ANALYZE", use_container_width=True)
+    run_single = st.button("▶  ANALYZE", width="stretch")
 
     st.markdown("---")
     st.markdown("**PORTFOLIO SCREENER**")
@@ -369,13 +431,13 @@ with st.sidebar:
         "Retail & Consumer": "COST, WMT, TGT, MCD, SBUX, NKE, KO, PEP, PG, DIS",
         "Healthcare": "UNH, JNJ, LLY, ABBV, MRK, PFE, TMO, DHR, ISRG, MDT",
         "Energy & Industrials": "XOM, CVX, CAT, GE, HON, DE, ETN, BA, RTX, UPS",
-        "Balanced Market Leaders": "AAPL, MSFT, NVDA, AMZN, META, JPM, V, COST, UNH, XOM, CAT, KO"
+        "Balanced Market Leaders": "AAPL, MSFT, NVDA, AMZN, META, JPM, V, COST, UNH, XOM, CAT, KO",
     }
 
     preset_choice = st.selectbox(
         "Choose portfolio preset",
         list(company_presets.keys()),
-        index=0
+        index=0,
     )
 
     default_list = company_presets[preset_choice]
@@ -384,13 +446,13 @@ with st.sidebar:
         "Portfolio tickers",
         value=default_list,
         height=140,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
     )
 
-    run_portfolio = st.button("▶  RUN SCREENER", use_container_width=True)
+    run_portfolio = st.button("▶  RUN SCREENER", width="stretch")
 
     st.markdown("---")
-    st.markdown(f"""
+    st.markdown("""
     <div style='font-size:10px;color:#2a3a55;font-family:IBM Plex Mono'>
     Data: Yahoo Finance · yfinance<br>
     Models: Weighted Multi-Factor<br>
@@ -409,16 +471,16 @@ if run_single and ticker_input:
         metrics = fetch_company_data(ticker_input)
 
     if not metrics:
-        st.error(f"Could not fetch data for '{ticker_input}'. Check the ticker symbol.")
+        st.error(f"Could not fetch data for '{ticker_input}'. Check the ticker symbol or try again in a minute.")
     else:
         health = calculate_health_score(metrics)
-        risk   = calculate_risk_score(metrics)
-        name   = metrics.get("name", ticker_input)
+        risk = calculate_risk_score(metrics)
+        name = metrics.get("name", ticker_input)
         sector = metrics.get("sector", "Unknown")
 
-        # Header
         hc = health_color(health.total_score)
         rc = risk_color(risk.risk_level)
+
         st.markdown(f"""
         <div class='metric-card'>
           <div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px'>
@@ -446,26 +508,35 @@ if run_single and ticker_input:
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            st.plotly_chart(make_gauge(health.total_score), use_container_width=True)
+            st.plotly_chart(
+                make_gauge(health.total_score),
+                width="stretch",
+                key=f"single_gauge_{ticker_input}",
+            )
         with col2:
-            st.plotly_chart(make_radar(health.components, ticker_input), use_container_width=True)
+            st.plotly_chart(
+                make_radar(health.components, ticker_input),
+                width="stretch",
+                key=f"single_radar_{ticker_input}",
+            )
 
-        # Key metrics strip
         st.markdown("<div class='section-header'>KEY FINANCIAL METRICS</div>", unsafe_allow_html=True)
         m1, m2, m3, m4, m5, m6 = st.columns(6)
-        m1.metric("Revenue Growth",  fmt_pct(metrics.get("revenueGrowth")))
-        m2.metric("Net Margin",      fmt_pct(metrics.get("profitMargins")))
-        m3.metric("ROA",             fmt_pct(metrics.get("returnOnAssets")))
-        m4.metric("Debt / Equity",   fmt_float(metrics.get("debtToEquity"), 0) + "%" if metrics.get("debtToEquity") else "—")
-        m5.metric("Current Ratio",   fmt_float(metrics.get("currentRatio")))
-        m6.metric("Beta",            fmt_float(metrics.get("beta")))
+        m1.metric("Revenue Growth", fmt_pct(metrics.get("revenueGrowth")))
+        m2.metric("Net Margin", fmt_pct(metrics.get("profitMargins")))
+        m3.metric("ROA", fmt_pct(metrics.get("returnOnAssets")))
+        m4.metric(
+            "Debt / Equity",
+            fmt_float(metrics.get("debtToEquity"), 0) + "%" if metrics.get("debtToEquity") is not None else "—",
+        )
+        m5.metric("Current Ratio", fmt_float(metrics.get("currentRatio")))
+        m6.metric("Beta", fmt_float(metrics.get("beta")))
 
-        # Risk signals
         st.markdown("<div class='section-header'>RISK SIGNAL BREAKDOWN</div>", unsafe_allow_html=True)
         sev_colors = {"LOW": "#f5a623", "MEDIUM": "#e87c3e", "HIGH": "#e85d4a", "CRITICAL": "#c0392b"}
         for sig in risk.signals:
-            icon  = "🔴" if sig.triggered else "🟢"
-            sc    = sev_colors.get(sig.severity, "#4a6080") if sig.triggered else "#2a4060"
+            icon = "🔴" if sig.triggered else "🟢"
+            sc = sev_colors.get(sig.severity, "#4a6080") if sig.triggered else "#2a4060"
             st.markdown(f"""
             <div class='signal-row' style='border-left:3px solid {sc}'>
               <div style='display:flex;justify-content:space-between;align-items:center'>
@@ -476,7 +547,6 @@ if run_single and ticker_input:
             </div>
             """, unsafe_allow_html=True)
 
-        # Altman Z
         if risk.altman_z_proxy is not None:
             z = risk.altman_z_proxy
             z_label = "SAFE ZONE (>2.99)" if z > 2.99 else ("GREY ZONE (1.81–2.99)" if z > 1.81 else "DISTRESS ZONE (<1.81)")
@@ -494,7 +564,6 @@ if run_single and ticker_input:
             </div>
             """, unsafe_allow_html=True)
 
-
 # ── Portfolio Screener View ────────────────────────────────────────────────────
 
 elif run_portfolio and portfolio_input:
@@ -504,111 +573,132 @@ elif run_portfolio and portfolio_input:
         raw = fetch_multiple(tickers, verbose=False)
 
     if not raw:
-        st.error("No data could be fetched. Check your ticker list.")
+        st.error("No data could be fetched. Check your ticker list or try again in a minute.")
     else:
         rows = []
         for t, m in raw.items():
-            h  = calculate_health_score(m)
+            h = calculate_health_score(m)
             ri = calculate_risk_score(m)
             rows.append({
-                "ticker":      t,
-                "name":        m.get("name", t)[:25],
-                "sector":      m.get("sector", "Unknown"),
+                "ticker": t,
+                "name": m.get("name", t)[:25],
+                "sector": m.get("sector", "Unknown"),
                 "health_score": h.total_score,
-                "grade":       h.grade,
-                "risk_score":  ri.risk_score,
-                "risk_level":  ri.risk_level,
-                "altman_z":    ri.altman_z_proxy,
-                "rev_growth":  m.get("revenueGrowth"),
-                "net_margin":  m.get("profitMargins"),
-                "roa":         m.get("returnOnAssets"),
-                "d2e":         m.get("debtToEquity"),
-                "components":  h.components,
-                "metrics":     m,
-                "health":      h,
-                "risk":        ri,
+                "grade": h.grade,
+                "risk_score": ri.risk_score,
+                "risk_level": ri.risk_level,
+                "altman_z": ri.altman_z_proxy,
+                "rev_growth": m.get("revenueGrowth"),
+                "net_margin": m.get("profitMargins"),
+                "roa": m.get("returnOnAssets"),
+                "d2e": m.get("debtToEquity"),
+                "components": h.components,
+                "metrics": m,
+                "health": h,
+                "risk": ri,
             })
 
         df = pd.DataFrame(rows)
-        df_sorted = df.sort_values("health_score", ascending=False).reset_index(drop=True)
+        if df.empty:
+            st.error("No valid companies were returned.")
+        else:
+            df_sorted = df.sort_values("health_score", ascending=False).reset_index(drop=True)
 
-        # Summary KPI strip
-        st.markdown("<div class='section-header'>PORTFOLIO OVERVIEW</div>", unsafe_allow_html=True)
-        ka, kb, kc, kd, ke = st.columns(5)
-        ka.metric("Companies Analyzed",   len(df))
-        kb.metric("Avg Health Score",     f"{df['health_score'].mean():.1f}")
-        kc.metric("High Risk Companies",  int((df["risk_level"].isin(["HIGH", "CRITICAL", "ELEVATED"])).sum()))
-        kd.metric("Best Performer",       df.loc[df["health_score"].idxmax(), "ticker"])
-        ke.metric("Most Signals",         df.loc[df["risk_score"].idxmax(), "ticker"])
+            st.markdown("<div class='section-header'>PORTFOLIO OVERVIEW</div>", unsafe_allow_html=True)
+            ka, kb, kc, kd, ke = st.columns(5)
+            ka.metric("Companies Analyzed", len(df))
+            kb.metric("Avg Health Score", f"{df['health_score'].mean():.1f}")
+            kc.metric("High Risk Companies", int((df["risk_level"].isin(["HIGH", "CRITICAL", "ELEVATED"])).sum()))
+            kd.metric("Best Performer", df.loc[df["health_score"].idxmax(), "ticker"])
+            ke.metric("Most Signals", df.loc[df["risk_score"].idxmax(), "ticker"])
 
-        st.markdown("<div class='section-header'>HEALTH SCORE RANKING</div>", unsafe_allow_html=True)
-        col_a, col_b = st.columns([3, 2])
-        with col_a:
-            st.plotly_chart(make_comparison_bar(df_sorted), use_container_width=True)
-        with col_b:
-            st.plotly_chart(make_risk_heatmap(df_sorted), use_container_width=True)
+            st.markdown("<div class='section-header'>HEALTH SCORE RANKING</div>", unsafe_allow_html=True)
+            col_a, col_b = st.columns([3, 2])
+            with col_a:
+                st.plotly_chart(
+                    make_comparison_bar(df_sorted),
+                    width="stretch",
+                    key="portfolio_comparison_bar",
+                )
+            with col_b:
+                st.plotly_chart(
+                    make_risk_heatmap(df_sorted),
+                    width="stretch",
+                    key="portfolio_risk_heatmap",
+                )
 
-        st.markdown("<div class='section-header'>RISK vs HEALTH QUADRANT</div>", unsafe_allow_html=True)
-        st.plotly_chart(make_scatter_quadrant(df_sorted), use_container_width=True)
+            st.markdown("<div class='section-header'>RISK vs HEALTH QUADRANT</div>", unsafe_allow_html=True)
+            st.plotly_chart(
+                make_scatter_quadrant(df_sorted),
+                width="stretch",
+                key="portfolio_scatter_quadrant",
+            )
 
-        # Detailed table
-        st.markdown("<div class='section-header'>COMPANY SCORECARD</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-header'>COMPANY SCORECARD</div>", unsafe_allow_html=True)
 
-        for _, row in df_sorted.iterrows():
-            hc = health_color(row["health_score"])
-            rc = risk_color(row["risk_level"])
-            gc = grade_color(row["grade"])
+            for i, row in df_sorted.iterrows():
+                with st.expander(
+                    f"{'🟢' if row['risk_score']==0 else '🟡' if row['risk_score']<=2 else '🔴'}  "
+                    f"{row['ticker']}  ·  {row['name']}  ·  Health {row['health_score']:.0f}  ·  Risk {row['risk_level']}",
+                    expanded=False,
+                ):
+                    c1, c2, c3 = st.columns([1, 1, 1])
 
-            with st.expander(
-                f"{'🟢' if row['risk_score']==0 else '🟡' if row['risk_score']<=2 else '🔴'}  "
-                f"{row['ticker']}  ·  {row['name']}  ·  Health {row['health_score']:.0f}  ·  Risk {row['risk_level']}",
-                expanded=False
-            ):
-                c1, c2, c3 = st.columns([1, 1, 1])
-                with c1:
-                    st.plotly_chart(make_gauge(row["health_score"]), use_container_width=True)
-                with c2:
-                    st.plotly_chart(make_radar(row["components"], row["ticker"]), use_container_width=True)
-                with c3:
-                    st.markdown(f"""
-                    <div style='padding:12px'>
-                      <div class='kpi-label'>SECTOR</div>
-                      <div style='color:#c9d1e0;font-size:14px;margin-bottom:12px'>{row.get("sector","—")}</div>
-                      <div class='kpi-label'>INTERPRETATION</div>
-                      <div style='color:#8899bb;font-size:12px;margin-bottom:12px'>{row["health"].interpretation}</div>
-                      <div class='kpi-label'>RISK SUMMARY</div>
-                      <div style='color:#8899bb;font-size:12px'>{row["risk"].summary}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    with c1:
+                        st.plotly_chart(
+                            make_gauge(row["health_score"]),
+                            width="stretch",
+                            key=f"gauge_{row['ticker']}_{i}",
+                        )
 
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Rev Growth",  fmt_pct(row["rev_growth"]))
-                m2.metric("Net Margin",  fmt_pct(row["net_margin"]))
-                m3.metric("ROA",         fmt_pct(row["roa"]))
-                m4.metric("D/E Ratio",   fmt_float(row["d2e"], 0) + "%" if row["d2e"] else "—")
+                    with c2:
+                        st.plotly_chart(
+                            make_radar(row["components"], row["ticker"]),
+                            width="stretch",
+                            key=f"radar_{row['ticker']}_{i}",
+                        )
 
-        # Export
-        st.markdown("---")
-        export_df = df_sorted[[
-            "ticker", "name", "sector", "health_score", "grade",
-            "risk_score", "risk_level", "altman_z",
-            "rev_growth", "net_margin", "roa", "d2e"
-        ]].copy()
-        export_df.columns = [
-            "Ticker", "Company", "Sector", "Health Score", "Grade",
-            "Risk Signals", "Risk Level", "Altman Z (proxy)",
-            "Revenue Growth", "Net Margin", "ROA", "D/E Ratio"
-        ]
-        csv = export_df.to_csv(index=False)
-        st.download_button(
-            "⬇  EXPORT RESULTS (CSV)",
-            data=csv,
-            file_name=f"risk_radar_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-        )
+                    with c3:
+                        st.markdown(f"""
+                        <div style='padding:12px'>
+                          <div class='kpi-label'>SECTOR</div>
+                          <div style='color:#c9d1e0;font-size:14px;margin-bottom:12px'>{row.get("sector","—")}</div>
+                          <div class='kpi-label'>INTERPRETATION</div>
+                          <div style='color:#8899bb;font-size:12px;margin-bottom:12px'>{row["health"].interpretation}</div>
+                          <div class='kpi-label'>RISK SUMMARY</div>
+                          <div style='color:#8899bb;font-size:12px'>{row["risk"].summary}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Rev Growth", fmt_pct(row["rev_growth"]))
+                    m2.metric("Net Margin", fmt_pct(row["net_margin"]))
+                    m3.metric("ROA", fmt_pct(row["roa"]))
+                    m4.metric(
+                        "D/E Ratio",
+                        fmt_float(row["d2e"], 0) + "%" if row["d2e"] is not None else "—",
+                    )
+
+            st.markdown("---")
+            export_df = df_sorted[[
+                "ticker", "name", "sector", "health_score", "grade",
+                "risk_score", "risk_level", "altman_z",
+                "rev_growth", "net_margin", "roa", "d2e"
+            ]].copy()
+            export_df.columns = [
+                "Ticker", "Company", "Sector", "Health Score", "Grade",
+                "Risk Signals", "Risk Level", "Altman Z (proxy)",
+                "Revenue Growth", "Net Margin", "ROA", "D/E Ratio"
+            ]
+            csv = export_df.to_csv(index=False)
+            st.download_button(
+                "⬇  EXPORT RESULTS (CSV)",
+                data=csv,
+                file_name=f"risk_radar_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+            )
 
 else:
-    # Welcome screen
     st.markdown("""
     <div style='text-align:center;padding:60px 0'>
       <div style='font-size:48px;margin-bottom:16px'>📡</div>
